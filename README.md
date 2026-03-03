@@ -150,3 +150,21 @@ Stack obrigatória do desafio. Utilizado com Entity Framework Core e `Pomelo.Ent
 ### Por que separar `CustomerCustodyItem` do Event Store?
 
 O Event Store é a fonte de verdade (write side). O `CustomerCustodyItem` é um read model atualizado a cada evento, permitindo consultas rápidas de carteira sem precisar reproduzir todos os eventos a cada requisição.
+
+### Por que CI?
+
+Em um sistema financeiro, a confiabilidade das regras de negócio é crítica — um erro no cálculo de IR, no arredondamento de lotes ou na distribuição proporcional pode gerar prejuízo real aos clientes. A pipeline de CI garante que nenhuma alteração quebre o build ou os testes antes de entrar na branch principal.
+
+### Decisão: apenas CI, sem CD automático
+
+Optei por implementar somente a etapa de **integração contínua** (build + testes unitários). O deploy contínuo (CD) foi descartado por enquanto porque:
+
+- A aplicação depende de infraestrutura local (MySQL + Kafka) que não está provisionada em nenhum ambiente de cloud
+- O projeto é um desafio técnico, sem necessidade de ambiente de produção ativo
+
+A pipeline roda automaticamente a cada `push` em qualquer branch e em Pull Requests com destino a `main`, garantindo:
+
+1. `dotnet restore` — resolução de dependências
+2. `dotnet build --configuration Release` — compilação sem erros
+3. `dotnet test` — execução dos testes unitários com coleta de code coverage
+4. Upload dos resultados (TRX + coverage) como artefato da run
