@@ -1,3 +1,4 @@
+using Api.Observability;
 using Application.Interfaces;
 using Domain.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -37,12 +38,14 @@ public class RebalancingBackgroundService : BackgroundService
                         _logger.LogInformation("Running deviation rebalancing check");
                         await rebalancingEngine.RebalanceOnDeviationAsync(basket, stoppingToken);
                         _logger.LogInformation("Deviation rebalancing check completed");
+                        AppMetrics.RebalancingChecksTotal.Inc();
                     }
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error running rebalancing deviation check");
+                AppMetrics.RebalancingErrorsTotal.Inc();
             }
 
             // Check once per day

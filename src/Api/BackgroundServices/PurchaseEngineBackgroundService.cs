@@ -1,3 +1,4 @@
+using Api.Observability;
 using Application.Interfaces;
 using Domain.Enums;
 using Domain.Interfaces;
@@ -40,11 +41,13 @@ public class PurchaseEngineBackgroundService : BackgroundService
                     await purchaseEngine.ExecuteAsync(now, installment.Value, stoppingToken);
 
                     _logger.LogInformation("Purchase cycle completed for {Date}", now);
+                    AppMetrics.PurchaseCyclesTotal.Inc();
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error executing purchase cycle");
+                AppMetrics.PurchaseCycleErrorsTotal.Inc();
             }
 
             // Check once per hour
