@@ -17,7 +17,7 @@ public class PurchaseEngineService : IPurchaseEngineService
     private readonly IBuyCycleRepository _buyCycleRepository;
     private readonly IEventStore _eventStore;
     private readonly IKafkaProducer _kafkaProducer;
-    private readonly IrCalculationService _irCalculationService;
+    private readonly IIrCalculationService _irCalculationService;
     private readonly string _irDedoDuroTopic;
 
     public PurchaseEngineService(
@@ -29,7 +29,7 @@ public class PurchaseEngineService : IPurchaseEngineService
         IBuyCycleRepository buyCycleRepository,
         IEventStore eventStore,
         IKafkaProducer kafkaProducer,
-        IrCalculationService irCalculationService,
+        IIrCalculationService irCalculationService,
         string irDedoDuroTopic)
     {
         _customerRepository = customerRepository;
@@ -67,7 +67,7 @@ public class PurchaseEngineService : IPurchaseEngineService
         cycle.TotalValue = totalPurchase;
 
         // Step 1: calculate how much to buy per asset (after deducting master balance)
-        // Save previous master balances so step 2 can compute totalAvailable correctly (BUG 6 fix)
+        // Save previous master balances so step 2 can compute totalAvailable correctly
         var purchasedQuantities = new Dictionary<Guid, decimal>();
         var previousMasterBalances = new Dictionary<Guid, decimal>();
 
@@ -76,7 +76,7 @@ public class PurchaseEngineService : IPurchaseEngineService
             var price = await _assetPriceRepository.GetLastClosingPriceAsync(composition.Asset.Ticker);
             if (price is null or 0) continue;
 
-            // BUG 5 fix: TRUNCAR(Valor / Cotacao) conforme RN-028
+            // TRUNCAR(Valor / Cotacao) conforme RN-028
             decimal targetQty = Math.Floor((totalPurchase * composition.Percentage / 100m) / price.Value);
 
             var masterItem = await _masterCustodyRepository.GetByAssetIdAsync(composition.AssetId);
@@ -117,7 +117,7 @@ public class PurchaseEngineService : IPurchaseEngineService
             var price = await _assetPriceRepository.GetLastClosingPriceAsync(composition.Asset.Ticker);
             if (price is null or 0) continue;
 
-            // BUG 6 fix: distribuir sobre total disponível (comprado + saldo master anterior) conforme RN-037
+            // Distribute over total available (bought + previous master balance) conforme RN-037
             decimal prevBalance = previousMasterBalances.GetValueOrDefault(composition.AssetId, 0m);
             decimal totalAvailable = boughtQty + prevBalance;
 
@@ -132,6 +132,7 @@ public class PurchaseEngineService : IPurchaseEngineService
 
                 var events = await _eventStore.GetEventsAsync(customer.Id, ct);
                 var aggregate = CustomerCustodyAggregate.Recreate(events);
+                aggregate.CustomerId = customer.Id;
 
                 decimal irTax = _irCalculationService.CalculateDedoDuro(customerQty * price.Value);
 
@@ -172,7 +173,7 @@ public class PurchaseEngineService : IPurchaseEngineService
 
             distributedPerAsset[composition.AssetId] = totalDistributed;
 
-            // BUG 7 fix: sempre atualizar master com o residual, mesmo quando residual = 0
+            // Sempre atualizar master com o residual, mesmo quando residual = 0
             decimal residual = totalAvailable - totalDistributed;
             var masterItemFinal = await _masterCustodyRepository.GetByAssetIdAsync(composition.AssetId);
             if (masterItemFinal is not null)

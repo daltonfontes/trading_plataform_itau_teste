@@ -45,7 +45,7 @@ public static class DependencyInjection
         services.AddScoped<CotahistImportService>();
 
         // Application services
-        services.AddScoped<IrCalculationService>();
+        services.AddScoped<IIrCalculationService, IrCalculationService>();
 
         var irDedoDuroTopic    = configuration["Kafka:TopicIrDedoDuro"]    ?? "ir-dedo-duro";
         var irRebalancingTopic = configuration["Kafka:TopicIrRebalancing"] ?? "ir-rebalancing";
@@ -64,7 +64,7 @@ public static class DependencyInjection
             sp.GetRequiredService<IBuyCycleRepository>(),
             sp.GetRequiredService<IEventStore>(),
             sp.GetRequiredService<IKafkaProducer>(),
-            sp.GetRequiredService<IrCalculationService>(),
+            sp.GetRequiredService<IIrCalculationService>(),
             irDedoDuroTopic));
 
         services.AddScoped<IRebalancingEngineService>(sp => new RebalancingEngineService(
@@ -73,7 +73,7 @@ public static class DependencyInjection
             sp.GetRequiredService<ICustomerCustodyRepository>(),
             sp.GetRequiredService<IEventStore>(),
             sp.GetRequiredService<IKafkaProducer>(),
-            sp.GetRequiredService<IrCalculationService>(),
+            sp.GetRequiredService<IIrCalculationService>(),
             deviationThreshold,
             irRebalancingTopic));
 

@@ -1,8 +1,9 @@
+using Application.Interfaces;
 using Domain.Events;
 
 namespace Application.Services;
 
-public class IrCalculationService
+public class IrCalculationService : IIrCalculationService
 {
     private const decimal DedoDuroRate = 0.00005m; // 0.005%
     private const decimal RebalancingIrRate = 0.20m; // 20%

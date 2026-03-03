@@ -28,13 +28,16 @@ public class PurchaseEngineBackgroundService : BackgroundService
             {
                 var now = DateTime.Today;
 
-                if (TryGetInstallment(now, out Installment installment))
+                using var scope = _scopeFactory.CreateScope();
+                var cycleRepo = scope.ServiceProvider.GetRequiredService<IBuyCycleRepository>();
+                var installment = await GetPendingInstallmentAsync(now, cycleRepo);
+
+                if (installment is not null)
                 {
                     _logger.LogInformation("Executing purchase cycle for {Date}, installment {Installment}", now, installment);
 
-                    using var scope = _scopeFactory.CreateScope();
                     var purchaseEngine = scope.ServiceProvider.GetRequiredService<IPurchaseEngineService>();
-                    await purchaseEngine.ExecuteAsync(now, installment, stoppingToken);
+                    await purchaseEngine.ExecuteAsync(now, installment.Value, stoppingToken);
 
                     _logger.LogInformation("Purchase cycle completed for {Date}", now);
                 }
@@ -49,36 +52,29 @@ public class PurchaseEngineBackgroundService : BackgroundService
         }
     }
 
-    private bool TryGetInstallment(DateTime today, out Installment installment)
+    private static async Task<Installment?> GetPendingInstallmentAsync(DateTime today, IBuyCycleRepository cycleRepo)
     {
-        installment = default;
-
         if (today.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday)
-            return false;
-
-        // We need IBuyCycleRepository to check if already executed.
-        // Using a scope here to avoid holding a scoped service in singleton.
-        using var scope = _scopeFactory.CreateScope();
-        var cycleRepo = scope.ServiceProvider.GetRequiredService<IBuyCycleRepository>();
+            return null;
 
         int day = today.Day;
 
         if (day >= 5 && day < 15)
         {
-            bool alreadyDone = cycleRepo.AlreadyExecutedAsync(today.Year, today.Month, Installment.Day5).GetAwaiter().GetResult();
-            if (!alreadyDone) { installment = Installment.Day5; return true; }
+            bool alreadyDone = await cycleRepo.AlreadyExecutedAsync(today.Year, today.Month, Installment.Day5);
+            if (!alreadyDone) return Installment.Day5;
         }
         else if (day >= 15 && day < 25)
         {
-            bool alreadyDone = cycleRepo.AlreadyExecutedAsync(today.Year, today.Month, Installment.Day15).GetAwaiter().GetResult();
-            if (!alreadyDone) { installment = Installment.Day15; return true; }
+            bool alreadyDone = await cycleRepo.AlreadyExecutedAsync(today.Year, today.Month, Installment.Day15);
+            if (!alreadyDone) return Installment.Day15;
         }
         else if (day >= 25)
         {
-            bool alreadyDone = cycleRepo.AlreadyExecutedAsync(today.Year, today.Month, Installment.Day25).GetAwaiter().GetResult();
-            if (!alreadyDone) { installment = Installment.Day25; return true; }
+            bool alreadyDone = await cycleRepo.AlreadyExecutedAsync(today.Year, today.Month, Installment.Day25);
+            if (!alreadyDone) return Installment.Day25;
         }
 
-        return false;
+        return null;
     }
 }

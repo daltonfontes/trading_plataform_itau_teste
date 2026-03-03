@@ -6,12 +6,12 @@ namespace Domain.Events
     (
         Guid EventId,
         DateTime OccurredOn,
-        Guid CostumerId,
+        Guid CustomerId,
         string Ticker,
         decimal Quantity,
         decimal UnityPrice,
         decimal TotalPrice,
         decimal Tax, // IRDEDODURO
         Guid BuyCicleId
-    ) : DomainEvent(EventId, OccurredOn, "CustomerCustody", CostumerId);
+    ) : DomainEvent(EventId, OccurredOn, "CustomerCustody", CustomerId);
 }

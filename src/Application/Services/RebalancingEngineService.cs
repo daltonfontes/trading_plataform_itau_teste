@@ -14,7 +14,7 @@ public class RebalancingEngineService : IRebalancingEngineService
     private readonly ICustomerCustodyRepository _customerCustodyRepository;
     private readonly IEventStore _eventStore;
     private readonly IKafkaProducer _kafkaProducer;
-    private readonly IrCalculationService _irCalculationService;
+    private readonly IIrCalculationService _irCalculationService;
     private readonly decimal _deviationThreshold;
     private readonly string _irRebalancingTopic;
 
@@ -24,7 +24,7 @@ public class RebalancingEngineService : IRebalancingEngineService
         ICustomerCustodyRepository customerCustodyRepository,
         IEventStore eventStore,
         IKafkaProducer kafkaProducer,
-        IrCalculationService irCalculationService,
+        IIrCalculationService irCalculationService,
         decimal deviationThreshold,
         string irRebalancingTopic)
     {
@@ -55,6 +55,7 @@ public class RebalancingEngineService : IRebalancingEngineService
         {
             var events = await _eventStore.GetEventsAsync(customer.Id, ct);
             var aggregate = CustomerCustodyAggregate.Recreate(events);
+            aggregate.CustomerId = customer.Id;
             var salesThisMonth = new List<AssetsSoldRebalancing>();
 
             foreach (var assetId in removedAssetIds)
@@ -120,6 +121,7 @@ public class RebalancingEngineService : IRebalancingEngineService
 
             var events = await _eventStore.GetEventsAsync(customer.Id, ct);
             var aggregate = CustomerCustodyAggregate.Recreate(events);
+            aggregate.CustomerId = customer.Id;
             var salesThisMonth = new List<AssetsSoldRebalancing>();
 
             foreach (var composition in basket.Compositions)

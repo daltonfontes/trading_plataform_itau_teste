@@ -5,7 +5,7 @@ namespace Domain.Aggregates
 {
     public class CustomerCustodyAggregate
     {
-        public Guid CostumerId { get; set; }
+        public Guid CustomerId { get; set; }
         public Dictionary<string, decimal> Positions { get; private set; } = [];
         public Dictionary<string, decimal> AveragePrice { get; private set; } = [];
         private readonly List<DomainEvent> _events = [];
@@ -15,6 +15,7 @@ namespace Domain.Aggregates
             var aggregate = new CustomerCustodyAggregate();
             foreach (var e in events)
             {
+                aggregate.CustomerId = e.AggregateId;
                 aggregate.Apply(e);
             }
             return aggregate;
@@ -26,7 +27,7 @@ namespace Domain.Aggregates
             var contributionEvent = new DistributedContribution(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
-                CostumerId,
+                CustomerId,
                 ticker,
                 quantity,
                 price,
@@ -51,12 +52,9 @@ namespace Domain.Aggregates
                         / Positions[distributedContribution.Ticker];
                     break;
 
-                // outros eventos de contribuição, como venda, dividendos, rebaalanceamento etc.
-
                 case AssetsSoldRebalancing assetsSoldRebalancing:
                     Positions[assetsSoldRebalancing.Ticker] = Positions.GetValueOrDefault(assetsSoldRebalancing.Ticker) - assetsSoldRebalancing.Quantity;
                     break;
-
             }
         }
 
@@ -66,7 +64,7 @@ namespace Domain.Aggregates
             var saleEvent = new AssetsSoldRebalancing(
                 Guid.NewGuid(),
                 DateTime.UtcNow,
-                CostumerId,
+                CustomerId,
                 ticker,
                 quantity,
                 unitPrice,
