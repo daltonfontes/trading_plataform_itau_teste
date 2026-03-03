@@ -1,0 +1,33 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Rider / VS Code
+.idea/
+.vscode/
+
+## Build outputs
+*.dll
+*.pdb
+*.exe
+*.cache
+*.runtimeconfig.json
+*.deps.json
+
+## NuGet
+*.nuget.props
+*.nuget.targets
+project.nuget.cache
+project.assets.json
+*.nuget.dgspec.json
+
+## User secrets
+appsettings.*.json
+!appsettings.Development.json
+
+## OS
+.DS_Store
+Thumbs.db
