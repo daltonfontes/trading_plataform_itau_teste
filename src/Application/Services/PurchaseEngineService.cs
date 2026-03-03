@@ -67,26 +67,29 @@ public class PurchaseEngineService : IPurchaseEngineService
         cycle.TotalValue = totalPurchase;
 
         // Step 1: calculate how much to buy per asset (after deducting master balance)
+        // Save previous master balances so step 2 can compute totalAvailable correctly (BUG 6 fix)
         var purchasedQuantities = new Dictionary<Guid, decimal>();
+        var previousMasterBalances = new Dictionary<Guid, decimal>();
 
         foreach (var composition in basket.Compositions)
         {
             var price = await _assetPriceRepository.GetLastClosingPriceAsync(composition.Asset.Ticker);
             if (price is null or 0) continue;
 
-            decimal targetQty = (totalPurchase * composition.Percentage / 100m) / price.Value;
+            // BUG 5 fix: TRUNCAR(Valor / Cotacao) conforme RN-028
+            decimal targetQty = Math.Floor((totalPurchase * composition.Percentage / 100m) / price.Value);
 
             var masterItem = await _masterCustodyRepository.GetByAssetIdAsync(composition.AssetId);
             decimal masterBalance = masterItem?.Quantity ?? 0m;
+            previousMasterBalances[composition.AssetId] = masterBalance;
 
             decimal toBuy = Math.Max(0m, targetQty - masterBalance);
 
-            // Split into standard lots and fractional remainder
+            // Split into standard lots (multiplos de 100) and fractional remainder
             decimal standardLots = Math.Floor(toBuy / 100m) * 100m;
             decimal fractional = toBuy - standardLots;
             decimal totalBought = standardLots + fractional;
 
-            // Update master custody
             var masterCustodyItem = masterItem ?? new MasterCustodyItem
             {
                 Id = Guid.NewGuid(),
@@ -114,16 +117,19 @@ public class PurchaseEngineService : IPurchaseEngineService
             var price = await _assetPriceRepository.GetLastClosingPriceAsync(composition.Asset.Ticker);
             if (price is null or 0) continue;
 
+            // BUG 6 fix: distribuir sobre total disponível (comprado + saldo master anterior) conforme RN-037
+            decimal prevBalance = previousMasterBalances.GetValueOrDefault(composition.AssetId, 0m);
+            decimal totalAvailable = boughtQty + prevBalance;
+
             decimal totalDistributed = 0m;
 
             foreach (var customer in customers)
             {
                 decimal proportion = (customer.MonthlyContribution / 3m) / totalPurchase;
-                decimal customerQty = Math.Floor(boughtQty * proportion);
+                decimal customerQty = Math.Floor(totalAvailable * proportion);
 
                 if (customerQty <= 0) continue;
 
-                // Load aggregate via event store and register contribution
                 var events = await _eventStore.GetEventsAsync(customer.Id, ct);
                 var aggregate = CustomerCustodyAggregate.Recreate(events);
 
@@ -138,7 +144,6 @@ public class PurchaseEngineService : IPurchaseEngineService
 
                 await _eventStore.AppendAsync(aggregate.GetEvents(), ct);
 
-                // Sync read model (CustomerCustodyItem)
                 var custodyItem = await _customerCustodyRepository.GetByCustomerAndAssetAsync(customer.Id, composition.AssetId)
                     ?? new CustomerCustodyItem { Id = Guid.NewGuid(), CustomerId = customer.Id, AssetId = composition.AssetId };
 
@@ -150,12 +155,14 @@ public class PurchaseEngineService : IPurchaseEngineService
 
                 await _customerCustodyRepository.UpsertAsync(custodyItem);
 
-                // Publish IR dedo-duro to Kafka
+                // Publish IR dedo-duro to Kafka (CPF incluído conforme RN-056)
                 await _kafkaProducer.PublishAsync(_irDedoDuroTopic, new IrDedoDuroEvent(
                     customer.Id,
+                    customer.CPF,
                     date,
                     composition.Asset.Ticker,
                     customerQty,
+                    price.Value,
                     customerQty * price.Value,
                     irTax,
                     cycle.Id), ct);
@@ -165,17 +172,13 @@ public class PurchaseEngineService : IPurchaseEngineService
 
             distributedPerAsset[composition.AssetId] = totalDistributed;
 
-            // Residual stays in master custody (already accounted for in step 1)
-            decimal residual = boughtQty - totalDistributed;
-            if (residual > 0)
+            // BUG 7 fix: sempre atualizar master com o residual, mesmo quando residual = 0
+            decimal residual = totalAvailable - totalDistributed;
+            var masterItemFinal = await _masterCustodyRepository.GetByAssetIdAsync(composition.AssetId);
+            if (masterItemFinal is not null)
             {
-                var masterItem = await _masterCustodyRepository.GetByAssetIdAsync(composition.AssetId);
-                if (masterItem is not null)
-                {
-                    // Remove distributed from master; keep only residual
-                    masterItem.Quantity = residual;
-                    await _masterCustodyRepository.UpsertAsync(masterItem);
-                }
+                masterItemFinal.Quantity = residual;
+                await _masterCustodyRepository.UpsertAsync(masterItemFinal);
             }
         }
 

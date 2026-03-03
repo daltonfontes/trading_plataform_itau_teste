@@ -48,6 +48,7 @@ public class DataContext : DbContext
         modelBuilder.Entity<TopFiveBasket>(e =>
         {
             e.HasKey(b => b.Id);
+            e.Property(b => b.Name).HasMaxLength(200).IsRequired();
             e.Property(b => b.Status).HasConversion<string>();
             e.HasMany(b => b.Compositions)
              .WithOne()

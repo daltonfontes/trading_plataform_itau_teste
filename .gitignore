@@ -31,3 +31,7 @@ appsettings.*.json
 ## OS
 .DS_Store
 Thumbs.db
+
+## Arquivos COTAHIST da B3 (muito grandes para o GitHub, >100MB)
+cotacoes/*.TXT
+cotacoes/*.txt

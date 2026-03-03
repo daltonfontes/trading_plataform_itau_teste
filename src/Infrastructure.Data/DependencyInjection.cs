@@ -30,6 +30,7 @@ public static class DependencyInjection
         services.AddScoped<ICustomerCustodyRepository, CustomerCustodyRepository>();
         services.AddScoped<IBuyCycleRepository, BuyCycleRepository>();
         services.AddScoped<IAssetPriceRepository, AssetPriceRepository>();
+        services.AddScoped<IAssetRepository, AssetRepository>();
 
         // Event Store
         services.AddScoped<EventSerializer>();
@@ -75,6 +76,9 @@ public static class DependencyInjection
             sp.GetRequiredService<IrCalculationService>(),
             deviationThreshold,
             irRebalancingTopic));
+
+        services.AddScoped<ICustomerService, CustomerService>();
+        services.AddScoped<IBasketService, BasketService>();
 
         return services;
     }
